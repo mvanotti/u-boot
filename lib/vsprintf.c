@@ -716,11 +716,13 @@ int sprintf(char * buf, const char *fmt, ...)
 
 void panic(const char *fmt, ...)
 {
+#ifndef CONFIG_SILENT
 	va_list	args;
 	va_start(args, fmt);
 	vprintf(fmt, args);
 	putc('\n');
 	va_end(args);
+#endif
 #if defined (CONFIG_PANIC_HANG)
 	hang();
 #else

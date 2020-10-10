@@ -29,7 +29,16 @@
 #include <fdt.h>
 #include <libfdt.h>
 #include <fdt_support.h>
-
+#include <fastboot.h>
+#include <asm/arch/clock.h>
+#include <asm/arch/drv_display.h>
+#ifdef CONFIG_ALLWINNER
+#include <boot_type.h>
+#include <axp_power.h>
+#include <sunxi_board.h>
+#include <pmu.h>
+#endif
+#include <sys_config.h>
 DECLARE_GLOBAL_DATA_PTR;
 
 #if defined (CONFIG_SETUP_MEMORY_TAGS) || \
@@ -79,10 +88,16 @@ void arch_lmb_reserve(struct lmb *lmb)
 	lmb_reserve(lmb, sp,
 		    gd->bd->bi_dram[0].start + gd->bd->bi_dram[0].size - sp);
 }
-
 static void announce_and_cleanup(void)
 {
-	printf("\nStarting kernel ...\n\n");
+	axp_set_next_poweron_status(0x0e);
+	board_display_wait_lcd_open();		//add by jerry
+	board_display_set_exit_mode(1);
+	sunxi_board_close_source();
+#ifdef CONFIG_SMALL_MEMSIZE
+        reload_config();
+#endif
+        tick_printf("\nStarting kernel ...\n\n");
 
 #ifdef CONFIG_USB_DEVICE
 	{
@@ -96,22 +111,22 @@ static void announce_and_cleanup(void)
 int do_bootm_linux(int flag, int argc, char *argv[], bootm_headers_t *images)
 {
 	bd_t	*bd = gd->bd;
-	char	*s;
 	int	machid = bd->bi_arch_number;
 	void	(*kernel_entry)(int zero, int arch, uint params);
 
 #ifdef CONFIG_CMDLINE_TAG
+	char cmdline[FASTBOOT_BOOT_ARGS_SIZE];
 	char *commandline = getenv ("bootargs");
+	char *sig = getenv("signature");
+	char *serial_info = getenv("sunxi_serial");
+	char *hardware_info = getenv("sunxi_hardware");
+	char *verifiedbootstate_info = getenv("verifiedbootstate");
+	char *rotpk_info = getenv("sunxi_rotpk");
+	char data[16] = {0};
 #endif
 
 	if ((flag != 0) && (flag != BOOTM_STATE_OS_GO))
 		return 1;
-
-	s = getenv ("machid");
-	if (s) {
-		machid = simple_strtoul (s, NULL, 16);
-		printf ("Using machid 0x%x from environment\n", machid);
-	}
 
 	show_boot_progress (15);
 
@@ -141,7 +156,77 @@ int do_bootm_linux(int flag, int argc, char *argv[], bootm_headers_t *images)
 	setup_memory_tags (bd);
 #endif
 #ifdef CONFIG_CMDLINE_TAG
-	setup_commandline_tag (bd, commandline);
+
+	/*cmdline  fix start*/
+	memset(data, 0, 16);
+	memset(cmdline, 0, sizeof(cmdline));
+
+	strcpy(cmdline, "boot_type=");
+	sprintf(data, "%d", uboot_spare_head.boot_data.storage_type);
+	strcat(cmdline, data);
+
+	strcat(cmdline, " disp_para=");
+	board_display_setenv(data);
+	strcat(cmdline, data);
+
+	strcat(cmdline, " fb_base=");
+	sprintf(data , "0x%x", (uint)gd->fb_base);
+	strcat(cmdline, data);
+
+	if(sig != NULL)
+	{
+		strcat(cmdline, " signature=");
+		strcat(cmdline, sig);
+	}
+	if(gd->chargemode == 1)
+	{
+		if((0==strcmp(getenv("bootcmd"),"run setargs_mmc boot_normal"))||
+                (0==strcmp(getenv("bootcmd"),"run setargs_nand boot_normal"))||
+                (0==strcmp(getenv("bootcmd"),"run setargs_nor boot_normal")))
+		{
+			printf("only in boot normal mode, pass charger para to kernel\n");
+			strcat(cmdline," boot.mode=charger");
+		}
+	}
+
+	strcat(cmdline, " config_size=");
+	sprintf(data, "%d", script_get_length());
+	strcat(cmdline, data);
+
+	if(rotpk_info != NULL)
+	{
+		strcat(cmdline,  " boot.sunxi_rotpk=");
+		strcat(cmdline, rotpk_info);
+	}
+
+	if(verifiedbootstate_info != NULL)
+	{
+		strcat(cmdline,  " boot.verifiedbootstate=");
+		strcat(cmdline, verifiedbootstate_info);
+	}
+	if(serial_info != NULL)
+	{
+		strcat(cmdline,  " boot.serialno=");
+		strcat(cmdline, serial_info);
+	}
+	if(hardware_info != NULL)
+	{
+		strcat(cmdline,  " boot.hardware=");
+		strcat(cmdline, hardware_info);
+	}
+
+    /*cmdline fix end*/
+    strcat(cmdline, " ");
+    strcat(cmdline, commandline);
+    setup_commandline_tag (bd, cmdline);
+#endif
+#ifdef CONFIG_CMDLINE_TAG
+#ifdef CONFIG_READ_LOGO_FOR_KERNEL
+	if(gd->fb_base != 0)
+	{
+            sprintf(commandline ,"%s%s%x",commandline," fb_base=0x",(uint)gd->fb_base);
+        }
+#endif
 #endif
 #ifdef CONFIG_INITRD_TAG
 	if (images->rd_start && images->rd_end)
@@ -153,6 +238,141 @@ int do_bootm_linux(int flag, int argc, char *argv[], bootm_headers_t *images)
 	announce_and_cleanup();
 
 	kernel_entry(0, machid, bd->bi_boot_params);
+	/* does not return */
+
+	return 1;
+}
+
+/* Boot android style linux kernel and ramdisk */
+int do_boota_linux (struct fastboot_boot_img_hdr *hdr)
+{
+	ulong initrd_start, initrd_end;
+	void (*kernel_entry)(int zero, int arch, uint params);
+	bd_t *bd = gd->bd;
+
+#ifdef CONFIG_CMDLINE_TAG
+	char cmdline[FASTBOOT_BOOT_ARGS_SIZE];
+	char *commandline = getenv ("bootargs");
+	char *s = getenv("partitions");
+	char *sig = getenv("signature");
+	char *serial_info = getenv("sunxi_serial");
+	char *hardware_info = getenv("sunxi_hardware");
+	char *verifiedbootstate_info = getenv("verifiedbootstate");
+	char *rotpk_info = getenv("sunxi_rotpk");
+	char data[16] = {0};
+#endif
+
+	debug("do_boota_linux storage_type = %d\n", uboot_spare_head.boot_data.storage_type);
+
+	kernel_entry = (void (*)(int, int, uint))(hdr->kernel_addr);
+
+
+
+	initrd_start = hdr->ramdisk_addr;
+	initrd_end = initrd_start + hdr->ramdisk_size;
+#if defined (CONFIG_SETUP_MEMORY_TAGS) || \
+    defined (CONFIG_CMDLINE_TAG) || \
+    defined (CONFIG_INITRD_TAG) || \
+    defined (CONFIG_SERIAL_TAG) || \
+    defined (CONFIG_REVISION_TAG)
+	setup_start_tag (bd);
+#ifdef CONFIG_SERIAL_TAG
+	setup_serial_tag (&params);
+#endif
+#ifdef CONFIG_REVISION_TAG
+	setup_revision_tag (&params);
+#endif
+#ifdef CONFIG_SETUP_MEMORY_TAGS
+	setup_memory_tags (bd);
+#endif
+#ifdef CONFIG_CMDLINE_TAG
+
+	//cmdline  fix start
+	memset(data, 0, 16);
+	memset(cmdline, 0, sizeof(cmdline));
+
+	strcpy(cmdline, "boot_type=");
+	sprintf(data, "%d", uboot_spare_head.boot_data.storage_type);
+	strcat(cmdline, data);
+
+	strcat(cmdline, " disp_para=");
+	board_display_setenv(data);
+	strcat(cmdline, data);
+
+	strcat(cmdline, " fb_base=");
+	sprintf(data , "0x%x", (uint)gd->fb_base);
+	strcat(cmdline, data);
+
+	if(sig != NULL)
+	{
+		strcat(cmdline, " signature=");
+		strcat(cmdline, sig);
+	}
+	if(gd->chargemode == 1)
+	{
+		if((0==strcmp(getenv("bootcmd"),"run setargs_mmc boot_normal"))||(0==strcmp(getenv("bootcmd"),"run setargs_nand boot_normal")))
+		{
+			printf("only in boot normal mode, pass charger para to kernel\n");
+			strcat(cmdline," androidboot.mode=charger");
+		}
+	}
+
+	strcat(cmdline, " config_size=");
+	sprintf(data, "%d", script_get_length());
+	strcat(cmdline, data);
+
+	if(rotpk_info != NULL)
+	{
+		strcat(cmdline,  " androidboot.sunxi_rotpk=");
+		strcat(cmdline, rotpk_info);
+	}
+
+	if(verifiedbootstate_info != NULL)
+	{
+		strcat(cmdline,  " androidboot.verifiedbootstate=");
+		strcat(cmdline, verifiedbootstate_info);
+	}
+	if(serial_info != NULL)
+	{
+		strcat(cmdline,  " androidboot.serialno=");
+		strcat(cmdline, serial_info);
+	}
+	if(hardware_info != NULL)
+	{
+		strcat(cmdline,  " androidboot.hardware=");
+		strcat(cmdline, hardware_info);
+	}
+	//cmdline fix end
+
+	if(strlen((const char *)hdr->cmdline))
+	{
+		strcat((char *)hdr->cmdline, " ");
+		strcat(cmdline, " partitions=");
+		strcat(cmdline, s);
+		strcat((char *)hdr->cmdline, cmdline);
+		setup_commandline_tag (bd, (char *)hdr->cmdline);
+	} 
+	else 
+	{
+		strcat(cmdline, " ");
+
+		strcat(cmdline, commandline);
+		setup_commandline_tag (bd, cmdline);
+	}
+#endif
+#ifdef CONFIG_INITRD_TAG
+	if (hdr->ramdisk_size)
+		setup_initrd_tag (bd, initrd_start, initrd_end);
+#endif
+#if defined (CONFIG_VFD) || defined (CONFIG_LCD)
+	setup_videolfb_tag ((gd_t *) gd);
+#endif
+	setup_end_tag (bd);
+#endif
+	/* we assume that the kernel is in place */
+	announce_and_cleanup();
+
+	kernel_entry(0, bd->bi_arch_number, bd->bi_boot_params);
 	/* does not return */
 
 	return 1;
@@ -248,7 +468,8 @@ static void setup_memory_tags (bd_t *bd)
 
 		params->u.mem.start = bd->bi_dram[i].start;
 		params->u.mem.size = bd->bi_dram[i].size;
-
+                if(gd->ram_size_mb && (!bd->bi_dram[i].size))
+			params->u.mem.size = gd->ram_size_mb;
 		params = tag_next (params);
 	}
 }

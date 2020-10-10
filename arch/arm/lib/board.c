@@ -63,6 +63,9 @@
 DECLARE_GLOBAL_DATA_PTR;
 
 ulong monitor_flash_len;
+#ifdef CONFIG_USE_IRQ
+unsigned int gd_bk_addr;
+#endif
 
 #ifdef CONFIG_HAS_DATAFLASH
 extern int  AT91F_DataflashInit(void);
@@ -73,35 +76,53 @@ extern void dataflash_print_info(void);
 extern void rtl8019_get_enetaddr (uchar * addr);
 #endif
 
-#if defined(CONFIG_HARD_I2C) || \
-    defined(CONFIG_SOFT_I2C)
-#include <i2c.h>
+#if defined(CONFIG_PMU_USE_I2C)
+	#include <i2c.h>
+#elif defined(CONFIG_PMU_USE_P2WI)
+	#include <p2wi.h>
+#elif defined(CONFIG_PMU_USE_RSB)
+	#include <rsb.h>
+#else
+
 #endif
 
+#if defined(CONFIG_ALLWINNER)
+	#include <boot_type.h>
+	#include <sys_config.h>
+	#include <sys_partition.h>
+	#include <sunxi_board.h>
+	#include <asm/arch/dma.h>
+	#include <pmu.h>
+	#include <../fs/aw_fs/ff.h>
+	#include <securestorage.h>
+	#include <smc.h>
+#endif
 
+int sunxi_keydata_burn_by_usb(void);
+int sunxi_sprite_download_boot0_simple(void);
 /************************************************************************
  * Coloured LED functionality
  ************************************************************************
  * May be supplied by boards if desired
  */
-inline void __coloured_LED_init(void) {}
+static inline void __coloured_LED_init(void) {}
 void coloured_LED_init(void)
 	__attribute__((weak, alias("__coloured_LED_init")));
-inline void __red_LED_on(void) {}
+static inline void __red_LED_on(void) {}
 void red_LED_on(void) __attribute__((weak, alias("__red_LED_on")));
-inline void __red_LED_off(void) {}
+static inline void __red_LED_off(void) {}
 void red_LED_off(void) __attribute__((weak, alias("__red_LED_off")));
-inline void __green_LED_on(void) {}
+static inline void __green_LED_on(void) {}
 void green_LED_on(void) __attribute__((weak, alias("__green_LED_on")));
-inline void __green_LED_off(void) {}
+static inline void __green_LED_off(void) {}
 void green_LED_off(void) __attribute__((weak, alias("__green_LED_off")));
-inline void __yellow_LED_on(void) {}
+static inline void __yellow_LED_on(void) {}
 void yellow_LED_on(void) __attribute__((weak, alias("__yellow_LED_on")));
-inline void __yellow_LED_off(void) {}
+static inline void __yellow_LED_off(void) {}
 void yellow_LED_off(void) __attribute__((weak, alias("__yellow_LED_off")));
-inline void __blue_LED_on(void) {}
+static inline void __blue_LED_on(void) {}
 void blue_LED_on(void) __attribute__((weak, alias("__blue_LED_on")));
-inline void __blue_LED_off(void) {}
+static inline void __blue_LED_off(void) {}
 void blue_LED_off(void) __attribute__((weak, alias("__blue_LED_off")));
 
 /*
@@ -130,7 +151,7 @@ static int init_baudrate(void)
 
 static int display_banner(void)
 {
-	printf("\n\n%s\n\n", version_string);
+	tick_printf("\n\n%s\n\n", version_string);
 	debug("U-Boot code: %08lX -> %08lX  BSS: -> %08lX\n",
 	       _TEXT_BASE,
 	       _bss_start_ofs + _TEXT_BASE, _bss_end_ofs + _TEXT_BASE);
@@ -144,7 +165,21 @@ static int display_banner(void)
 
 	return (0);
 }
-
+#ifdef SUNXI_OTA_TEST
+static int display_ota_test(void)
+{
+	printf("*********************************************\n");
+	printf("*********************************************\n");
+	printf("*********************************************\n");
+	printf("*********************************************\n");
+	printf("********[OTA TEST]:update uboot sucess*******\n");
+	printf("*********************************************\n");
+	printf("*********************************************\n");
+	printf("*********************************************\n");
+	printf("*********************************************\n");
+	return 0;
+}
+#endif
 /*
  * WARNING: this code looks "cleaner" than the PowerPC version, but
  * has the disadvantage that you either get nothing, or everything.
@@ -156,7 +191,8 @@ static int display_dram_config(void)
 {
 	int i;
 
-#ifdef DEBUG
+//#ifdef DEBUG
+#if 0
 	puts("RAM Configuration:\n");
 
 	for (i = 0; i < CONFIG_NR_DRAM_BANKS; i++) {
@@ -169,22 +205,35 @@ static int display_dram_config(void)
 	for (i = 0; i < CONFIG_NR_DRAM_BANKS; i++)
 		size += gd->bd->bi_dram[i].size;
 
-	puts("DRAM:  ");
+	tick_printf("DRAM:  ");
+	//puts("DRAM:  ");
 	print_size(size, "\n");
 #endif
 
 	return (0);
 }
 
-#if defined(CONFIG_HARD_I2C) || defined(CONFIG_SOFT_I2C)
-static int init_func_i2c(void)
+extern char uboot_hash_value[64];
+static int print_commit_log(void)
 {
-	puts("I2C:   ");
-	i2c_init(CONFIG_SYS_I2C_SPEED, CONFIG_SYS_I2C_SLAVE);
+        tick_printf("uboot commit : %s \n",uboot_hash_value);
+        return 0;
+}
+
+static int init_func_pmubus(void)
+{
+	tick_printf("pmbus:   ");
+
+#if defined(CONFIG_PMU_USE_I2C)
+	i2c_init(CONFIG_SYS_I2C_SPEED,CONFIG_SYS_I2C_SLAVE);
+#elif defined(CONFIG_PMU_USE_P2WI)
+	p2wi_init();
+#elif defined(CONFIG_PMU_USE_RSB)
+	sunxi_rsb_init(0);
+#endif
 	puts("ready\n");
 	return (0);
 }
-#endif
 
 #if defined(CONFIG_CMD_PCI) || defined (CONFIG_PCI)
 #include <pci.h>
@@ -195,6 +244,21 @@ static int arm_pci_init(void)
 }
 #endif /* CONFIG_CMD_PCI || CONFIG_PCI */
 
+#if defined(CONFIG_SUNXI_AXP)
+extern int power_init(void);
+#endif
+extern int check_update_key(void);
+extern int display_inner(void);
+extern int script_init(void);
+extern int get_debugmode_flag(void);
+extern int check_uart_input(void);
+extern int power_source_init(void);
+#if defined(CONFIG_USE_NEON_SIMD)
+extern int arm_neon_init(void);
+#endif
+extern int smc_init(void);
+extern int sunxi_probe_securemode(void);
+extern int sunxi_probe_enable_securebit(void);
 /*
  * Breathe some life into the board...
  *
@@ -219,7 +283,6 @@ static int arm_pci_init(void)
  * "continue" and != 0 means "fatal error, hang the system".
  */
 typedef int (init_fnc_t) (void);
-
 int print_cpuinfo(void);
 
 void __dram_init_banksize(void)
@@ -230,9 +293,36 @@ void __dram_init_banksize(void)
 void dram_init_banksize(void)
 	__attribute__((weak, alias("__dram_init_banksize")));
 
+int __sunxi_probe_securemode(void)
+{
+	return 0;
+}
+int sunxi_probe_securemode(void)
+	__attribute__((weak, alias("__sunxi_probe_securemode")));
+
+int __smc_init(void)
+{
+	return 0;
+}
+int smc_init(void)
+	__attribute__((weak, alias("__smc_init")));
+
+#ifdef CONFIG_SUNXI_SECURE_SYSTEM
+int __sunxi_probe_enable_securebit(void)
+{
+	return 0;
+}
+int sunxi_probe_enable_securebit(void)
+	__attribute__((weak, alias("__sunxi_probe_enable_securebit")));
+#endif
+
 init_fnc_t *init_sequence[] = {
-#if defined(CONFIG_ARCH_CPU_INIT)
+//#if defined(CONFIG_ARCH_CPU_INIT)
 	arch_cpu_init,		/* basic arch cpu dependent setup */
+//#endif
+	sunxi_probe_securemode,
+#if defined(CONFIG_USE_NEON_SIMD)
+	arm_neon_init,
 #endif
 #if defined(CONFIG_BOARD_EARLY_INIT_F)
 	board_early_init_f,
@@ -241,24 +331,39 @@ init_fnc_t *init_sequence[] = {
 #ifdef CONFIG_FSL_ESDHC
 	get_clocks,
 #endif
-	env_init,		/* initialize environment */
+	env_init,			/* initialize environment */
 	init_baudrate,		/* initialze baudrate settings */
 	serial_init,		/* serial communications setup */
 	console_init_f,		/* stage 1 init of console */
 	display_banner,		/* say that we are here */
+	display_inner,      /* show the inner version */
+        print_commit_log,
+	script_init,
+#if defined(SUNXI_OTA_TEST)
+	display_ota_test,
+#endif
+        get_debugmode_flag,
 #if defined(CONFIG_DISPLAY_CPUINFO)
 	print_cpuinfo,		/* display cpu info (and speed) */
 #endif
 #if defined(CONFIG_DISPLAY_BOARDINFO)
 	checkboard,		/* display board info */
 #endif
-#if defined(CONFIG_HARD_I2C) || defined(CONFIG_SOFT_I2C)
-	init_func_i2c,
-#endif
+	smc_init,
+	init_func_pmubus,
+	power_source_init,
+	check_update_key,
+	check_uart_input,
 	dram_init,		/* configure available RAM banks */
-	NULL,
+#ifdef CONFIG_SUNXI_SECURE_SYSTEM
+	sunxi_probe_enable_securebit,
+#endif
+        NULL,
 };
 
+#if defined(CONFIG_CPUS_STANDBY)
+extern void do_box_standby(void);
+#endif
 void board_init_f(ulong bootflag)
 {
 	bd_t *bd;
@@ -266,21 +371,25 @@ void board_init_f(ulong bootflag)
 	gd_t *id;
 	ulong addr, addr_sp;
 
+#if defined(CONFIG_ARCH_SUN8IW6P1)|defined(CONFIG_ARCH_SUN8IW9P1)
+        memset((void*)CONFIG_SYS_SRAM_BASE, 0, 4*1024);
+#endif
 	/* Pointer is writable since we allocated a register for it */
 	gd = (gd_t *) ((CONFIG_SYS_INIT_SP_ADDR) & ~0x07);
 	/* compiler optimization barrier needed for GCC >= 3.4 */
 	__asm__ __volatile__("": : :"memory");
 
 	memset((void *)gd, 0, sizeof(gd_t));
+	gd->mon_len = _bss_end_ofs + sizeof(struct spare_boot_head_t);
+        gd->debug_mode = 1;
 
-	gd->mon_len = _bss_end_ofs;
-
+	//while((*(volatile unsigned int *)(0)) != 1);
 	for (init_fnc_ptr = init_sequence; *init_fnc_ptr; ++init_fnc_ptr) {
 		if ((*init_fnc_ptr)() != 0) {
-			hang ();
+			//hang ();
+			sunxi_board_run_fel_eraly();	/* modify by jerry */
 		}
 	}
-
 	debug("monitor len: %08lX\n", gd->mon_len);
 	/*
 	 * Ram is setup, size stored in gd !!
@@ -299,8 +408,10 @@ void board_init_f(ulong bootflag)
 	 */
 	gd->ram_size -= CONFIG_SYS_MEM_TOP_HIDE;
 #endif
-
-	addr = CONFIG_SYS_SDRAM_BASE + gd->ram_size;
+	if(gd->ram_size)
+		addr = CONFIG_SYS_SDRAM_BASE + gd->ram_size;
+	else
+        addr = CONFIG_SYS_SDRAM_BASE + (1U<<30);
 
 #ifdef CONFIG_LOGBUFFER
 #ifndef CONFIG_ALT_LB_ADDR
@@ -309,6 +420,10 @@ void board_init_f(ulong bootflag)
 	debug("Reserving %dk for kernel logbuffer at %08lx\n", LOGBUFF_LEN,
 		addr);
 #endif
+#endif
+
+#ifdef CONFIG_SUNXI_LOGBUFFER
+	addr -= (SUNXI_DISPLAY_FRAME_BUFFER_SIZE);
 #endif
 
 #ifdef CONFIG_PRAM
@@ -363,6 +478,10 @@ void board_init_f(ulong bootflag)
 	addr_sp = addr - TOTAL_MALLOC_LEN;
 	debug("Reserving %dk for malloc() at: %08lx\n",
 			TOTAL_MALLOC_LEN >> 10, addr_sp);
+#ifdef CONFIG_NONCACHE_MEMORY
+	addr_sp &= (~(0x00100000 -1));
+	addr_sp -= CONFIG_NONCACHE_MEMORY_SIZE;
+#endif
 	/*
 	 * (permanently) allocate a Board Info struct
 	 * and a permanent copy of the "global" data
@@ -410,14 +529,15 @@ void board_init_f(ulong bootflag)
 	/* Ram ist board specific, so move it to board code ... */
 	dram_init_banksize();
 	display_dram_config();	/* and display it */
-
-	gd->relocaddr = addr;
+	gd->relocaddr = addr + sizeof(struct spare_boot_head_t) + sizeof(uboot_hash_value);
 	gd->start_addr_sp = addr_sp;
 	gd->reloc_off = addr - _TEXT_BASE;
-	debug("relocation Offset is: %08lx\n", gd->reloc_off);
+	printf("relocation Offset is: %08lx\n", gd->reloc_off);
+	memcpy((void *)addr, (void *)_TEXT_BASE, sizeof(uboot_hash_value)+sizeof(struct spare_boot_head_t));
+	debug("from %x to %x, size %x\n", (void *)_TEXT_BASE, (void *)addr, sizeof(struct spare_boot_head_t));
 	memcpy(id, (void *)gd, sizeof(gd_t));
 
-	relocate_code(addr_sp, id, addr);
+	relocate_code(addr_sp, id, addr + sizeof(struct spare_boot_head_t)+sizeof(uboot_hash_value));
 
 	/* NOTREACHED - relocate_code() does not return */
 }
@@ -436,33 +556,42 @@ static char *failed = "*** failed ***\n";
  *
  ************************************************************************
  */
-
 void board_init_r(gd_t *id, ulong dest_addr)
 {
 	char *s;
-	bd_t *bd;
+	//bd_t *bd;
 	ulong malloc_start;
+#ifdef CONFIG_NONCACHE_MEMORY
+	uint  malloc_noncache_start;
+#endif
 #if !defined(CONFIG_SYS_NO_FLASH)
 	ulong flash_size;
 #endif
-
+	int workmode;
+	int ret = 0;
+#ifdef CONFIG_SUNXI_HDCP_IN_SECURESTORAGE
+	int hdcpkey_enable=0;
+#endif
 	gd = id;
-	bd = gd->bd;
-
+	gd_bk_addr = (unsigned int)id;
+	//bd = gd->bd;
 	gd->flags |= GD_FLG_RELOC;	/* tell others: relocation done */
 
 	monitor_flash_len = _end_ofs;
 
+	malloc_start = dest_addr - TOTAL_MALLOC_LEN - sizeof(struct spare_boot_head_t);
+#ifdef CONFIG_NONCACHE_MEMORY_SIZE
+	malloc_start &= (~(0x00100000 -1));
+	malloc_noncache_start = malloc_start - CONFIG_NONCACHE_MEMORY_SIZE;
+	gd->malloc_noncache_start = malloc_noncache_start;
+#endif
 	/* Enable caches */
 	enable_caches();
-
 	debug("monitor flash len: %08lX\n", monitor_flash_len);
 	board_init();	/* Setup chipselects */
-
 #ifdef CONFIG_SERIAL_MULTI
 	serial_initialize();
 #endif
-
 	debug("Now running in RAM - U-Boot at: %08lx\n", dest_addr);
 
 #ifdef CONFIG_LOGBUFFER
@@ -473,9 +602,31 @@ void board_init_r(gd_t *id, ulong dest_addr)
 #endif
 
 	/* The Malloc area is immediately below the monitor copy in DRAM */
-	malloc_start = dest_addr - TOTAL_MALLOC_LEN;
 	mem_malloc_init (malloc_start, TOTAL_MALLOC_LEN);
+#ifdef CONFIG_SMALL_MEMSIZE
+        save_config();
+#endif
+#ifdef CONFIG_NONCACHE_MEMORY
+	mem_noncache_malloc_init(malloc_noncache_start, CONFIG_NONCACHE_MEMORY_SIZE);
+#endif
+#if defined(CONFIG_ARCH_HOMELET)
+	check_physical_key_early();
+#endif
 
+	workmode = uboot_spare_head.boot_data.work_mode;
+	debug("work mode %d\n", workmode);
+
+	axp_reinit();
+	//uboot_spare_head.boot_data.work_mode = WORK_MODE_CARD_PRODUCT;
+	printf("%s %d\n", __FILE__, __LINE__);
+#if defined(CONFIG_CPUS_STANDBY) //目前只在homelet上使用
+	do_box_standby();
+#endif
+
+#ifdef 	CONFIG_ARCH_HOMELET
+	gpio_control();
+#endif
+#if 0
 #if !defined(CONFIG_SYS_NO_FLASH)
 	puts("Flash: ");
 
@@ -503,20 +654,92 @@ void board_init_r(gd_t *id, ulong dest_addr)
 		hang();
 	}
 #endif
-
-#if defined(CONFIG_CMD_NAND)
-	puts("NAND:  ");
-	nand_init();		/* go init the NAND */
+#endif
+	/* set up exceptions */
+	interrupt_init();
+	/* enable exceptions */
+	enable_interrupts();
+	sunxi_dma_init();
+#ifdef DEBUG
+    puts("ready to config storage\n");
 #endif
 
-#if defined(CONFIG_CMD_ONENAND)
-	onenand_init();
+	if((workmode == WORK_MODE_BOOT) || (workmode == WORK_MODE_CARD_PRODUCT) || (workmode == WORK_MODE_SPRITE_RECOVERY))
+	{
+#if (defined(CONFIG_SUNXI_DISPLAY) || defined(CONFIG_SUN7I_DISPLAY))
+	    drv_disp_init();
+#endif
+#ifdef CONFIG_SUNXI_HDCP_IN_SECURESTORAGE
+		ret = script_parser_fetch("hdmi_para", "hdmi_hdcp_enable", &hdcpkey_enable, 1);
+		if((ret) || (hdcpkey_enable != 1))
+		{
+			board_display_device_open();
+			board_display_layer_request();
+		}
+#else
+		board_display_device_open();
+		board_display_layer_request();
+#endif
+	}
+
+#ifdef CONFIG_SUNXI_HDCP_IN_SECURESTORAGE
+		//here: write key to hardware
+		if(hdcpkey_enable==1)
+		{
+			char buffer[4096];
+			int data_len;
+			int ret0;
+
+			memset(buffer, 0, 4096);
+			ret0 = sunxi_secure_storage_init();
+			if(ret0)
+			{
+				printf("sunxi init secure storage failed\n");
+			}
+			else
+			{
+				ret0 = sunxi_secure_object_read("hdcpkey", buffer, 4096, &data_len);
+				if(ret0)
+				{
+					printf("probe hdcp key failed\n");
+				}
+				else
+				{
+					ret0 = smc_aes_bssk_decrypt_to_keysram(buffer, data_len);
+					if(ret0)
+					{
+						printf("push hdcp key failed\n");
+					}
+					else
+					{
+						board_display_device_open();
+						board_display_layer_request();
+					}
+				}
+			}
+		}
 #endif
 
-#ifdef CONFIG_GENERIC_MMC
-       puts("MMC:   ");
-       mmc_initialize(bd);
+#ifdef  CONFIG_BOOT_A15
+	if(sunxi_sprite_download_boot0_simple())
+	{
+		printf("rewrite boot0 to save boot cpu failed\n");
+	}
 #endif
+//#else
+//#if defined(CONFIG_CMD_NAND)
+//	if(!storage_type){
+//		puts("NAND:  ");
+//		nand_init();        /* go init the NAND */
+//	}
+//#endif/*CONFIG_CMD_NAND*/
+//
+//#if defined(CONFIG_GENERIC_MMC)
+//	if(storage_type){
+//		puts("MMC:   ");
+//		mmc_initialize(bd);
+//	}
+//#endif/*CONFIG_GENERIC_MMC*/
 
 #ifdef CONFIG_HAS_DATAFLASH
 	AT91F_DataflashInit();
@@ -525,25 +748,20 @@ void board_init_r(gd_t *id, ulong dest_addr)
 
 	/* initialize environment */
 	env_relocate();
-
 #if defined(CONFIG_CMD_PCI) || defined(CONFIG_PCI)
 	arm_pci_init();
 #endif
 
 	/* IP Address */
 	gd->bd->bi_ip_addr = getenv_IPaddr("ipaddr");
-
 	stdio_init();	/* get the devices list going. */
-
 	jumptable_init();
-
 #if defined(CONFIG_API)
 	/* Initialize API */
 	api_init();
 #endif
 
 	console_init_r();	/* fully init console as a device */
-
 #if defined(CONFIG_ARCH_MISC_INIT)
 	/* miscellaneous arch dependent initialisations */
 	arch_misc_init();
@@ -552,12 +770,6 @@ void board_init_r(gd_t *id, ulong dest_addr)
 	/* miscellaneous platform dependent initialisations */
 	misc_init_r();
 #endif
-
-	 /* set up exceptions */
-	interrupt_init();
-	/* enable exceptions */
-	enable_interrupts();
-
 	/* Perform network card initialisation if necessary */
 #if defined(CONFIG_DRIVER_SMC91111) || defined (CONFIG_DRIVER_LAN91C96)
 	/* XXX: this needs to be moved to board init */
@@ -577,11 +789,9 @@ void board_init_r(gd_t *id, ulong dest_addr)
 	if (s != NULL)
 		copy_filename(BootFile, s, sizeof(BootFile));
 #endif
-
 #ifdef BOARD_LATE_INIT
 	board_late_init();
 #endif
-
 #ifdef CONFIG_BITBANGMII
 	bb_miiphy_init();
 #endif
@@ -629,12 +839,79 @@ void board_init_r(gd_t *id, ulong dest_addr)
 		setenv("mem", (char *)memsz);
 	}
 #endif
+	//sprite_cartoon_test();
+	if(workmode == WORK_MODE_BOOT)
+    {
+#if defined(CONFIG_SUNXI_SCRIPT_REINIT)
+		{
+			FATFS script_mount;
+			int  ret;
+			uint read_bytes = 0;
+			FILE  script_fs;
+			uchar  *buf = NULL;
 
+			f_mount_ex(0, &script_mount, 0);
+			ret = f_open (&script_fs, "0:script.bin", FA_OPEN_EXISTING | FA_READ | FA_WRITE );
+			if(ret)
+			{
+				printf("cant open script.bin, maybe it is not exist\n");
+			}
+			else
+			{
+				buf = (uchar *)malloc(100 * 1024);
+				memset(buf, 0, 100 * 1024);
+
+				if(!f_read(&script_fs, buf, 100 * 1024, &read_bytes))
+				{
+					printf("f_read read bytes = %d\n", read_bytes);
+				}
+				f_close(&script_fs);
+				puts("try to unlink file ");
+				printf("%d\n", f_unlink("0:script.bin"));
+			}
+			f_mount(0, NULL, NULL);
+			if(read_bytes > 0)
+			{
+				char *tmp_target_buffer = (char *)(CONFIG_SYS_TEXT_BASE - 0x01000000);
+
+				sunxi_flash_exit(1);
+
+				memcpy(tmp_target_buffer + uboot_spare_head.boot_head.uboot_length, buf, read_bytes);
+				sunxi_sprite_download_uboot(tmp_target_buffer, uboot_spare_head.boot_data.storage_type, 1);
+
+				reset_cpu(0);
+			}
+			if(buf)
+			{
+				free(buf);
+			}
+		}
+#endif
+    	printf("WORK_MODE_BOOT\n");
+#if (defined(CONFIG_SUNXI_DISPLAY) || defined(CONFIG_SUN7I_DISPLAY))
+		if(!ret)
+		{
+#ifndef CONFIG_ARCH_HOMELET
+			printf("board_status_probe\n");
+			board_status_probe(0);
+#endif
+		}
+#endif
+#ifdef CONFIG_READ_LOGO_FOR_KERNEL
+	    sunxi_read_bootlogo("bootlogo");
+#endif
+
+#ifdef CONFIG_USB_DEVICE_BURN
+	sunxi_keydata_burn_by_usb();
+#endif
+
+	}
 	/* main_loop() can return to retry autoboot, if so just run it again. */
-	for (;;) {
+	for (;;)
+	{
 		main_loop();
 	}
-
+	hang();
 	/* NOTREACHED - no way out of command loop except booting */
 }
 

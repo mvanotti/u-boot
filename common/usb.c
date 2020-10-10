@@ -327,8 +327,10 @@ int usb_parse_config(struct usb_device *dev, unsigned char *buffer, int cfgno)
 {
 	struct usb_descriptor_header *head;
 	int index, ifno, epno, curr_if_num;
+#ifdef	USB_DEBUG
 	int i;
 	unsigned char *ch;
+#endif
 
 	ifno = -1;
 	epno = -1;
@@ -384,13 +386,15 @@ int usb_parse_config(struct usb_device *dev, unsigned char *buffer, int cfgno)
 
 			USB_PRINTF("unknown Description Type : %x\n",
 				   head->bDescriptorType);
-
+#ifdef	USB_DEBUG
 			{
 				ch = (unsigned char *)head;
 				for (i = 0; i < head->bLength; i++)
 					USB_PRINTF("%02X ", *ch++);
 				USB_PRINTF("\n\n\n");
 			}
+#endif
+
 			break;
 		}
 		index += head->bLength;
@@ -1120,8 +1124,10 @@ void usb_hub_port_connect_change(struct usb_device *dev, int port)
 {
 	struct usb_device *usb;
 	struct usb_port_status portsts;
-	unsigned short portstatus, portchange;
-
+	unsigned short portstatus;
+#ifdef	USB_HUB_DEBUG
+	unsigned short portchange;
+#endif
 	/* Check status */
 	if (usb_get_port_status(dev, port + 1, &portsts) < 0) {
 		USB_HUB_PRINTF("get_port_status failed\n");
@@ -1129,10 +1135,11 @@ void usb_hub_port_connect_change(struct usb_device *dev, int port)
 	}
 
 	portstatus = le16_to_cpu(portsts.wPortStatus);
+#ifdef	USB_HUB_DEBUG
 	portchange = le16_to_cpu(portsts.wPortChange);
 	USB_HUB_PRINTF("portstatus %x, change %x, %s\n",
 			portstatus, portchange, portspeed(portstatus));
-
+#endif
 	/* Clear the connection change status */
 	usb_clear_port_feature(dev, port + 1, USB_PORT_FEAT_C_CONNECTION);
 
@@ -1180,7 +1187,9 @@ int usb_hub_configure(struct usb_device *dev)
 {
 	unsigned char buffer[USB_BUFSIZ], *bitmap;
 	struct usb_hub_descriptor *descriptor;
+#ifdef	USB_HUB_DEBUG
 	struct usb_hub_status *hubsts;
+#endif
 	int i;
 	struct usb_hub_device *hub;
 
@@ -1284,6 +1293,7 @@ int usb_hub_configure(struct usb_device *dev)
 		return -1;
 	}
 
+#ifdef	USB_HUB_DEBUG
 	hubsts = (struct usb_hub_status *)buffer;
 	USB_HUB_PRINTF("get_hub_status returned status %X, change %X\n",
 			le16_to_cpu(hubsts->wHubStatus),
@@ -1294,6 +1304,7 @@ int usb_hub_configure(struct usb_device *dev)
 	USB_HUB_PRINTF("%sover-current condition exists\n",
 		(le16_to_cpu(hubsts->wHubStatus) & HUB_STATUS_OVERCURRENT) ? \
 		"" : "no ");
+#endif
 	usb_hub_power_on(hub);
 
 	for (i = 0; i < dev->maxchild; i++) {

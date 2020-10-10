@@ -62,12 +62,14 @@ DECLARE_GLOBAL_DATA_PTR;
 	!defined(CONFIG_ENV_IS_IN_MG_DISK)	&& \
 	!defined(CONFIG_ENV_IS_IN_MMC)		&& \
 	!defined(CONFIG_ENV_IS_IN_NAND)		&& \
+	!defined(CONFIG_ENV_IS_IN_NAND_SUNXI)	&& \
 	!defined(CONFIG_ENV_IS_IN_NVRAM)	&& \
 	!defined(CONFIG_ENV_IS_IN_ONENAND)	&& \
 	!defined(CONFIG_ENV_IS_IN_SPI_FLASH)	&& \
+	!defined(CONFIG_ENV_IS_IN_SUNXI_FLASH)	&& \
 	!defined(CONFIG_ENV_IS_NOWHERE)
 # error Define one of CONFIG_ENV_IS_IN_{EEPROM|FLASH|DATAFLASH|ONENAND|\
-SPI_FLASH|MG_DISK|NVRAM|MMC} or CONFIG_ENV_IS_NOWHERE
+SPI_FLASH|MG_DISK|NVRAM|MMC|SUNXI_FLASH} or CONFIG_ENV_IS_NOWHERE
 #endif
 
 #define XMK_STR(x)	#x
@@ -107,6 +109,7 @@ int get_env_id(void)
  */
 static int env_print(char *name)
 {
+#ifndef CONFIG_SILENT
 	char *res = NULL;
 	size_t len;
 
@@ -130,6 +133,7 @@ static int env_print(char *name)
 		free(res);
 		return len;
 	}
+#endif
 
 	/* should never happen */
 	return 0;

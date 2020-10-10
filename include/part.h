@@ -45,6 +45,10 @@ typedef struct block_dev_desc {
 				      unsigned long start,
 				      lbaint_t blkcnt,
 				      void *buffer);
+	unsigned long	(*block_int_read)(int dev,
+				      unsigned long start,
+				      lbaint_t blkcnt,
+				      void *buffer);
 	unsigned long	(*block_write)(int dev,
 				       unsigned long start,
 				       lbaint_t blkcnt,
@@ -52,6 +56,46 @@ typedef struct block_dev_desc {
 	unsigned long   (*block_erase)(int dev,
 				       unsigned long start,
 				       lbaint_t blkcnt);
+	int (*block_secure_wipe)(int dev,
+						unsigned int start,
+						unsigned int blkcnt,
+						unsigned int *skip_space);
+	int (*block_mmc_erase)(int dev,
+						unsigned int start,
+						unsigned int blkcnt,
+						unsigned int *skip_space);
+	int (*block_mmc_trim)(int dev,
+						unsigned int start,
+						unsigned int blkcnt);
+	int (*block_mmc_discard)(int dev,
+						unsigned int start,
+						unsigned int blkcnt);
+	int (*block_mmc_sanitize)(int dev);
+	int (*block_mmc_secure_erase)(int dev,
+						unsigned int start,
+						unsigned int blkcnt,
+						unsigned int *skip_space);
+	int (*block_mmc_secure_trim)(int dev,
+						unsigned int start,
+						unsigned int blkcnt);
+	unsigned long	 (*block_read_mass_pro)(int dev,
+				      unsigned long start,
+				      lbaint_t blkcnt,
+				      void *buffer);
+	unsigned long	(*block_write_mass_pro)(int dev,
+				       unsigned long start,
+				       lbaint_t blkcnt,
+				       const void *buffer);
+	int	(*block_read_secure)(s32 dev_num,
+						u32 item,u8 *buf ,
+						lbaint_t blkcnt);
+	int	(*block_read_secure_backup)(s32 dev_num,
+						u32 item,u8 *buf ,
+						lbaint_t blkcnt);
+	int	(*block_write_secure)(s32 dev_num,
+						u32 item,u8 *buf ,
+						lbaint_t blkcnt);
+	int	(*block_get_item_secure)(void);
 	void		*priv;		/* driver private struct pointer */
 }block_dev_desc_t;
 
@@ -65,6 +109,8 @@ typedef struct block_dev_desc {
 #define IF_TYPE_MMC		6
 #define IF_TYPE_SD		7
 #define IF_TYPE_SATA		8
+#define IF_TYPE_NAND		9
+#define IF_TYPE_SUNXI_FLASH 10
 
 /* Part types */
 #define PART_TYPE_UNKNOWN	0x00
@@ -105,6 +151,11 @@ block_dev_desc_t* usb_stor_get_dev(int dev);
 block_dev_desc_t* mmc_get_dev(int dev);
 block_dev_desc_t* systemace_get_dev(int dev);
 block_dev_desc_t* mg_disk_get_dev(int dev);
+
+block_dev_desc_t* nand_get_dev(int dev);
+block_dev_desc_t* sunxi_flash_get_dev(int dev);
+
+
 
 /* disk/part.c */
 int get_partition_info (block_dev_desc_t * dev_desc, int part, disk_partition_t *info);

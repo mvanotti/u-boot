@@ -182,6 +182,43 @@ int strncmp(const char * cs,const char * ct,size_t count)
 }
 #endif
 
+#ifndef __HAVE_ARCH_STRCASECMP
+/**
+ * strcmp - Compare two strings, ignore case
+ * @cs: One string
+ * @ct: Another string
+ */
+int strcasecmp(const char *s1, const char *s2)
+{
+       int c1, c2;
+
+       do {
+               c1 = tolower(*s1++);
+               c2 = tolower(*s2++);
+       } while (c1 == c2 && c1 != 0);
+       return c1 - c2;
+}
+#endif
+
+#ifndef __HAVE_ARCH_STRNCASECMP
+/**
+ * strncmp - Compare two length-limited strings
+ * @cs: One string
+ * @ct: Another string
+ * @count: The maximum number of bytes to compare
+ */
+int strncasecmp(const char *s1, const char *s2, size_t n)
+{
+       int c1, c2;
+
+       do {
+               c1 = tolower(*s1++);
+               c2 = tolower(*s2++);
+       } while ((--n > 0) && c1 == c2 && c1 != 0);
+       return c1 - c2;
+}
+#endif
+
 #ifndef __HAVE_ARCH_STRCHR
 /**
  * strchr - Find the first occurrence of a character in a string
@@ -392,7 +429,8 @@ char *strswab(const char *s)
 }
 #endif
 
-#ifndef __HAVE_ARCH_MEMSET
+//#ifndef __HAVE_ARCH_MEMSET
+#if 1
 /**
  * memset - Fill a region of memory with the given value
  * @s: Pointer to the start of the area.
@@ -452,7 +490,8 @@ char * bcopy(const char * src, char * dest, int count)
 }
 #endif
 
-#ifndef __HAVE_ARCH_MEMCPY
+//#ifndef __HAVE_ARCH_MEMCPY
+#if 0
 /**
  * memcpy - Copy one area of memory to another
  * @dest: Where to copy to

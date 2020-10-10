@@ -254,8 +254,13 @@ static inline int BITRATE(struct usb_gadget *g)
  * used with CDC Ethernet, Linux 2.4 hosts will need updates to choose
  * the non-RNDIS configuration.
  */
+#ifdef CONFIG_ALLWINNER
+#define RNDIS_VENDOR_NUM	0x18d1
+#define RNDIS_PRODUCT_NUM	0x000a
+#else
 #define RNDIS_VENDOR_NUM	0x0525	/* NetChip */
 #define RNDIS_PRODUCT_NUM	0xa4a2	/* Ethernet/RNDIS Gadget */
+#endif
 
 /*
  * Some systems will want different product identifers published in the
@@ -1951,7 +1956,6 @@ static int is_eth_addr_valid(char *str)
 	if (strlen(str) == 17) {
 		int i;
 		char *p, *q;
-		uchar ea[6];
 
 		/* see if it looks like an ethernet address */
 
@@ -1960,7 +1964,7 @@ static int is_eth_addr_valid(char *str)
 		for (i = 0; i < 6; i++) {
 			char term = (i == 5 ? '\0' : ':');
 
-			ea[i] = simple_strtol(p, &q, 16);
+			simple_strtol(p, &q, 16);
 
 			if ((q - p) != 2 || *q++ != term)
 				break;

@@ -20,10 +20,21 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston,
 # MA 02111-1307 USA
 #
-PLATFORM_RELFLAGS += -fno-common -ffixed-r8 -msoft-float
-
+ifndef CONFIG_SPL
+PLATFORM_RELFLAGS += -fno-common -ffixed-r8
+else
+PLATFORM_RELFLAGS += -fno-common -msoft-float
+endif
 # Make ARMv5 to allow more compilers to work, even though its v7a.
-PLATFORM_CPPFLAGS += -march=armv5
+ifdef CONFIG_ARM_A8
+PLATFORM_CPPFLAGS += -mcpu=cortex-a8
+else
+PLATFORM_CPPFLAGS += -mcpu=cortex-a7
+endif
+
+#ifndef CONFIG_SPL
+PLATFORM_CPPFLAGS += -Werror -Wno-unused-variable -Wno-unused-but-set-variable
+#endif
 # =========================================================================
 #
 # Supply options according to compiler version

@@ -25,6 +25,8 @@ VERSION = 2011
 PATCHLEVEL = 09
 SUBLEVEL =
 EXTRAVERSION = -rc1
+OTA_TEST_NAME=ota_test
+
 ifneq "$(SUBLEVEL)" ""
 U_BOOT_VERSION = $(VERSION).$(PATCHLEVEL).$(SUBLEVEL)$(EXTRAVERSION)
 else
@@ -51,7 +53,7 @@ SHELL := $(shell if [ -x "$$BASH" ]; then echo $$BASH; \
 	else if [ -x /bin/bash ]; then echo /bin/bash; \
 	else echo sh; fi; fi)
 
-export	HOSTARCH HOSTOS SHELL
+export	HOSTARCH HOSTOS SHELL OTA_TEST_NAME
 
 # Deal with colliding definitions from tcsh etc.
 VENDOR=
@@ -137,9 +139,7 @@ unexport CDPATH
 
 # The "tools" are needed early, so put this first
 # Don't include stuff already done in $(LIBS)
-SUBDIRS	= tools \
-	  examples/standalone \
-	  examples/api
+SUBDIRS	= tools
 
 .PHONY : $(SUBDIRS) $(VERSION_FILE)
 
@@ -154,11 +154,11 @@ sinclude $(obj)include/autoconf.mk
 
 # load ARCH, BOARD, and CPU configuration
 include $(obj)include/config.mk
-export	ARCH CPU BOARD VENDOR SOC
+export	TARGET ARCH CPU BOARD VENDOR SOC
 
 # set default to nothing for native builds
 ifeq ($(HOSTARCH),$(ARCH))
-CROSS_COMPILE ?=
+CROSS_COMPILE ?= arm-linux-gnueabi-
 endif
 
 # load other configuration
@@ -215,6 +215,9 @@ LIBS  = lib/libgeneric.o
 LIBS += lib/lzma/liblzma.o
 LIBS += lib/lzo/liblzo.o
 LIBS += lib/zlib/libz.o
+ifdef CONFIG_SUNXI_SECURE_SYSTEM
+LIBS += lib/openssl/libopenssl.o
+endif
 LIBS += $(shell if [ -f board/$(VENDOR)/common/Makefile ]; then echo \
 	"board/$(VENDOR)/common/lib$(VENDOR).o"; fi)
 LIBS += $(CPUDIR)/lib$(CPU).o
@@ -228,11 +231,14 @@ LIBS += arch/$(ARCH)/lib/lib$(ARCH).o
 LIBS += fs/cramfs/libcramfs.o fs/fat/libfat.o fs/fdos/libfdos.o fs/jffs2/libjffs2.o \
 	fs/reiserfs/libreiserfs.o fs/ext2/libext2fs.o fs/yaffs2/libyaffs2.o \
 	fs/ubifs/libubifs.o
+LIBS += fs/aw_fs/libawfat.o
 LIBS += net/libnet.o
 LIBS += disk/libdisk.o
+LIBS += drivers/audio/libaudio.o
 LIBS += drivers/bios_emulator/libatibiosemu.o
 LIBS += drivers/block/libblock.o
 LIBS += drivers/dma/libdma.o
+LIBS += drivers/efuse/libefuse.o
 LIBS += drivers/fpga/libfpga.o
 LIBS += drivers/gpio/libgpio.o
 LIBS += drivers/hwmon/libhwmon.o
@@ -247,10 +253,16 @@ LIBS += drivers/mtd/ubi/libubi.o
 LIBS += drivers/mtd/spi/libspi_flash.o
 LIBS += drivers/net/libnet.o
 LIBS += drivers/net/phy/libphy.o
+LIBS += drivers/p2wi/libp2wi.o
 LIBS += drivers/pci/libpci.o
 LIBS += drivers/pcmcia/libpcmcia.o
 LIBS += drivers/power/libpower.o
+LIBS += drivers/pwm/libpwm.o
+LIBS += drivers/rsb/librsb.o
+LIBS += drivers/smc/libsmc.o
 LIBS += drivers/spi/libspi.o
+LIBS += drivers/spinor/libspinor.o
+LIBS += drivers/storage_type/libstorage_type.o
 ifeq ($(CPU),mpc83xx)
 LIBS += drivers/qe/libqe.o
 LIBS += arch/powerpc/cpu/mpc8xxx/lib8xxx.o
@@ -272,12 +284,18 @@ LIBS += drivers/usb/gadget/libusb_gadget.o
 LIBS += drivers/usb/host/libusb_host.o
 LIBS += drivers/usb/musb/libusb_musb.o
 LIBS += drivers/usb/phy/libusb_phy.o
+LIBS += drivers/usb/sunxi_usb/libusb_sunxi_usb.o
 LIBS += drivers/video/libvideo.o
+LIBS += drivers/video_sunxi/libvideo_sunxi.o
 LIBS += drivers/watchdog/libwatchdog.o
 LIBS += common/libcommon.o
 LIBS += lib/libfdt/libfdt.o
 LIBS += api/libapi.o
 LIBS += post/libpost.o
+LIBS += sprite/libsprite.o
+
+LIBS += usb_sunxi/libsunxi_usb.o
+LIBS += memtest/libsunxi_memtest.o
 
 ifeq ($(SOC),omap3)
 LIBS += $(CPUDIR)/omap-common/libomap-common.o
@@ -292,11 +310,26 @@ endif
 ifeq ($(SOC),s5pc2xx)
 LIBS += $(CPUDIR)/s5p-common/libs5p-common.o
 endif
+ifndef CONFIG_SUNXI_SPINOR_PLATFORM
+#ifeq ($(SOC),sunxi)
+LIBS += nand_sunxi/$(SOC)/osal/libnand_osal.o
+LIBS += nand_sunxi/$(SOC)/libsunxi-nand.o
+LIBS += nand_sunxi/$(SOC)/nand_interface/libnand_interface.o
+#endif
+endif
+
+ifndef CONFIG_NO_BOOT_STANDBY
+LIBS += $(STANDBYDIR)/libstandby.o
+endif
+ifdef CONFIG_CPUS_STANDBY
+LIBS += $(STANDBYDIR)/../box_standby/libboxstandby.o
+LIBS += $(STANDBYDIR)/../box_standby/cpus_pm/libcpus_pm.o
+endif
 
 LIBS := $(addprefix $(obj),$(sort $(LIBS)))
 .PHONY : $(LIBS) $(TIMESTAMP_FILE)
 
-LIBBOARD = board/$(BOARDDIR)/lib$(BOARD).o
+LIBBOARD = board/$(BOARDDIR)/lib$(BOARD).o board/$(VENDOR)/lib$(VENDOR).o
 LIBBOARD := $(addprefix $(obj),$(LIBBOARD))
 
 # Add GCC lib
@@ -309,14 +342,23 @@ endif
 else
 PLATFORM_LIBGCC = -L $(shell dirname `$(CC) $(CFLAGS) -print-libgcc-file-name`) -lgcc
 endif
+ifdef CONFIG_SUNXI_SECURE_SYSTEM
+PLATFORM_LIBS += -L./openssl -lssl -lcrypto $(PLATFORM_LIBGCC)
+else
 PLATFORM_LIBS += $(PLATFORM_LIBGCC)
-export PLATFORM_LIBS
+endif
+export PLATFORM_LIBS PLATFORM_LIBGCC
 
 # Special flags for CPP when processing the linker script.
 # Pass the version down so we can handle backwards compatibility
 # on the fly.
 LDPPFLAGS += \
 	-include $(TOPDIR)/include/u-boot/u-boot.lds.h \
+	-DCPUDIR=$(CPUDIR) \
+	-DSOCDIR=$(SOCDIR) \
+	-DSTANDBYDIR=$(STANDBYDIR) \
+	-DSTANDBY_ADDR=$(CONFIG_STANDBY_RUN_ADDR) \
+	-DBOOTADDR=$(CONFIG_SYS_TEXT_BASE)		  \
 	$(shell $(LD) --version | \
 	  sed -ne 's/GNU ld version \([0-9][0-9]*\)\.\([0-9][0-9]*\).*/-DLD_MAJOR=\1 -DLD_MINOR=\2/p')
 
@@ -342,7 +384,7 @@ BOARD_SIZE_CHECK =
 endif
 
 # Always append ALL so that arch config.mk's can add custom ones
-ALL-y += $(obj)u-boot.srec $(obj)u-boot.bin $(obj)System.map
+ALL-y += $(obj)u-boot.srec $(obj)u-boot.bin $(obj)System.map $(obj)u-boot-$(TARGET).bin
 
 ALL-$(CONFIG_NAND_U_BOOT) += $(obj)u-boot-nand.bin
 ALL-$(CONFIG_ONENAND_U_BOOT) += $(obj)u-boot-onenand.bin
@@ -398,6 +440,10 @@ $(obj)u-boot.ubl:       $(obj)u-boot-nand.bin
 		$(obj)tools/mkimage -n $(UBL_CONFIG) -T ublimage \
 		-e $(CONFIG_SYS_TEXT_BASE) -d $< $@
 
+$(obj)u-boot-$(TARGET).bin:	$(obj)u-boot.bin
+		@git show HEAD --pretty=format:"%H" | head -n 1 > cur.log
+		@./add_hash.sh -f u-boot.bin -m uboot
+
 GEN_UBOOT = \
 		UNDEF_SYM=`$(OBJDUMP) -x $(LIBBOARD) $(LIBS) | \
 		sed  -n -e 's/.*\($(SYM_PREFIX)__u_boot_cmd_.*\)/-u\1/p'|sort|uniq`;\
@@ -413,6 +459,52 @@ ifeq ($(CONFIG_KALLSYMS),y)
 		$(CC) $(CFLAGS) -DSYSTEM_MAP="\"$${smap}\"" \
 			-c common/system_map.c -o $(obj)common/system_map.o
 		$(GEN_UBOOT) $(obj)common/system_map.o
+endif
+
+spl_lib: $(TIMESTAMP_FILE) $(VERSION_FILE) depend
+		$(MAKE) -C sunxi_spl/spl all
+
+fes:    spl_lib depend
+		$(MAKE) -C sunxi_spl/fes_init all
+		@git show HEAD --pretty=format:"%H" | head -n 1 > cur.log
+		@./add_hash.sh -f sunxi_spl/fes_init/fes1.bin -m boot0
+		@$(TOPDIR)/tools/gen_check_sum sunxi_spl/fes_init/fes1.bin fes1.bin > /dev/null
+
+boot0:  spl_lib depend
+		$(MAKE) -C sunxi_spl/boot0 all
+ifdef CONFIG_STORAGE_MEDIA_NAND
+		@git show HEAD --pretty=format:"%H" | head -n 1 > cur.log
+		@./add_hash.sh -f sunxi_spl/boot0/boot0_nand.bin -m boot0
+		@$(TOPDIR)/tools/gen_check_sum sunxi_spl/boot0/boot0_nand.bin boot0_nand.bin > /dev/null
+endif
+ifdef CONFIG_STORAGE_MEDIA_MMC
+		@git show HEAD --pretty=format:"%H" | head -n 1 > cur.log
+		@./add_hash.sh -f sunxi_spl/boot0/boot0_sdcard.bin -m boot0
+		@$(TOPDIR)/tools/gen_check_sum sunxi_spl/boot0/boot0_sdcard.bin boot0_sdcard.bin > /dev/null
+endif
+ifdef CONFIG_STORAGE_MEDIA_SPINOR
+		@git show HEAD --pretty=format:"%H" | head -n 1 > cur.log
+		@./add_hash.sh -f sunxi_spl/boot0/boot0_spinor.bin -m boot0
+		@$(TOPDIR)/tools/gen_check_sum sunxi_spl/boot0/boot0_spinor.bin boot0_spinor.bin > /dev/null
+endif
+sboot:  spl_lib depend
+		$(MAKE) -C sunxi_spl/sbrom all
+		@git show HEAD --pretty=format:"%H" | head -n 1 > cur.log
+		@./add_hash.sh -f sunxi_spl/sbrom/sboot.bin -m sboot
+		@$(TOPDIR)/tools/gen_check_sum sunxi_spl/sbrom/sboot.bin sboot.bin > /dev/null
+
+ifeq ($(CONFIG_SUNXI_SECURE_SYSTEM),y)
+ifeq ($(SUNXI_MODE),$(OTA_TEST_NAME))
+spl:    boot0 sboot
+else
+spl:    fes boot0 sboot
+endif
+else
+ifeq ($(SUNXI_MODE),$(OTA_TEST_NAME))
+spl:    fes boot0
+else
+spl:    boot0
+endif
 endif
 
 $(OBJS):	depend
@@ -951,7 +1043,11 @@ clean:
 	       $(obj)board/matrix_vision/*/bootscript.img		  \
 	       $(obj)board/voiceblue/eeprom 				  \
 	       $(obj)u-boot.lds						  \
-	       $(obj)arch/blackfin/cpu/bootrom-asm-offsets.[chs]	  \
+	       $(obj)u-boot-$(TARGET).bin					\
+	       $(obj)sunxi_spl/boot0/boot0.lds      		  \
+	       $(obj)sunxi_spl/fes_init/fes_init.lds      	  \
+	       $(obj)sunxi_spl/sbrom/sboot.lds      	  \
+		   $(obj)arch/blackfin/cpu/bootrom-asm-offsets.[chs]	  \
 	       $(obj)arch/blackfin/cpu/init.{lds,elf}
 	@rm -f $(obj)include/bmp_logo.h
 	@rm -f $(obj)lib/asm-offsets.s
@@ -966,7 +1062,8 @@ clean:
 	@rm -f $(TIMESTAMP_FILE) $(VERSION_FILE)
 	@find $(OBJTREE) -type f \
 		\( -name 'core' -o -name '*.bak' -o -name '*~' \
-		-o -name '*.o'	-o -name '*.a' -o -name '*.exe'	\) -print \
+		-o -name '*.o'	-o -name '*.exe' -o -name '*.axf' \
+		-o -name '*.map' \) -print \
 		| xargs rm -f
 
 clobber:	clean

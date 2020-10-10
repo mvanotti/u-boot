@@ -29,6 +29,9 @@
 
 #include "ehci.h"
 
+//#undef debug
+//#define debug(fmt,args...)	printf(fmt ,##args)
+
 int rootdev;
 struct ehci_hccr *hccr;	/* R/O registers, not need for volatile */
 volatile struct ehci_hcor *hcor;
@@ -116,10 +119,14 @@ static struct descriptor {
  */
 static void flush_invalidate(u32 addr, int size, int flush)
 {
+#if 0
 	if (flush)
 		flush_dcache_range(addr, addr + size);
 	else
 		invalidate_dcache_range(addr, addr + size);
+#else
+	flush_dcache_range(addr, addr + size);
+#endif
 }
 
 static void cache_qtd(struct qTD *qtd, int flush)

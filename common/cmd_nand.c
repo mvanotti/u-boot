@@ -35,6 +35,11 @@ int mtdparts_init(void);
 int id_parse(const char *id, const char **ret_id, u8 *dev_type, u8 *dev_num);
 int find_dev_and_part(const char *id, struct mtd_device **dev,
 		      u8 *part_num, struct part_info **part);
+
+#elif defined(CONFIG_NAND_SUNXI)
+
+#include <sys_partition.h>
+
 #endif
 
 static int nand_dump(nand_info_t *nand, ulong off, int only_oob, int repeat)
@@ -166,6 +171,22 @@ static int get_part(const char *partname, int *idx, loff_t *off, loff_t *size)
 		return ret;
 
 	return 0;
+#elif defined(CONFIG_NAND_SUNXI)
+	int ret;
+
+	*idx = 0;
+	ret = sunxi_partition_get_info_byname(partname, off, size);
+	if(ret)
+	{
+		printf("Can not find partition \'%s\'\n", partname);
+		return ret;
+	}
+
+	*off  *= 512;
+	*size *= 512;
+
+	return 0;
+
 #else
 	puts("offset is not a number\n");
 	return -1;
@@ -466,8 +487,6 @@ int do_nand(cmd_tbl_t * cmdtp, int flag, int argc, char * const argv[])
 		int clean = argc > 2 && !strcmp("clean", argv[2]);
 		int o = clean ? 3 : 2;
 		int scrub = !strncmp(cmd, "scrub", 5);
-		int part = 0;
-		int chip = 0;
 		int spread = 0;
 		int args = 2;
 
@@ -475,10 +494,8 @@ int do_nand(cmd_tbl_t * cmdtp, int flag, int argc, char * const argv[])
 			if (!strcmp(&cmd[5], ".spread")) {
 				spread = 1;
 			} else if (!strcmp(&cmd[5], ".part")) {
-				part = 1;
 				args = 1;
 			} else if (!strcmp(&cmd[5], ".chip")) {
-				chip = 1;
 				args = 0;
 			} else {
 				goto usage;

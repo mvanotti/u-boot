@@ -14,7 +14,7 @@
 *.swp
 *.patch
 *.bin
-
+.tags*
 #
 # Top-level generic files
 #
@@ -46,6 +46,7 @@
 
 /include/generated/
 /lib/asm-offsets.s
+asm-offsets.s
 
 # stgit generated dirs
 patches-*
@@ -70,3 +71,5 @@ cscope.*
 /onenand_ipl/onenand-ipl*
 /onenand_ipl/board/*/onenand*
 /onenand_ipl/board/*/*.S
+
+cur.log

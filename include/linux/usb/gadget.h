@@ -18,6 +18,7 @@
 #ifndef __LINUX_USB_GADGET_H
 #define __LINUX_USB_GADGET_H
 
+#include <errno.h>
 #include <linux/list.h>
 
 struct usb_ep;
@@ -94,6 +95,7 @@ struct usb_request {
 
 	int			status;
 	unsigned		actual;
+	int			dma_flag;
 };
 
 /*-------------------------------------------------------------------------*/

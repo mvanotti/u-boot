@@ -44,6 +44,7 @@ extern int overwrite_console(void);
 
 #endif /* CONFIG_SYS_CONSOLE_IS_IN_ENV */
 
+#ifndef CONFIG_SILENT
 static int console_setfile(int file, struct stdio_dev * dev)
 {
 	int error = 0;
@@ -365,12 +366,39 @@ void puts(const char *s)
 	}
 }
 
+int tick_printf(const char *fmt, ...)
+{
+	va_list args;
+	uint i,msecond;
+	char printbuffer[CONFIG_SYS_PBSIZE-12];
+	char printbuffer_with_timestamp[CONFIG_SYS_PBSIZE];
+
+        if(!gd->debug_mode)
+            return 0;
+	va_start(args, fmt);
+
+	/* For this to work, printbuffer must be larger than
+	 * anything we ever want to print.
+	 */
+	msecond=get_timer_masked();
+	vsprintf(printbuffer, fmt, args);
+	i = sprintf(printbuffer_with_timestamp,"[%7u.%03u]%s",msecond/1000,msecond%1000,printbuffer);
+	va_end(args);
+	/* Print the string */
+	puts(printbuffer_with_timestamp);
+
+	return i;
+
+}
+
 int printf(const char *fmt, ...)
 {
 	va_list args;
 	uint i;
 	char printbuffer[CONFIG_SYS_PBSIZE];
 
+        if(!gd->debug_mode)
+            return 0;
 	va_start(args, fmt);
 
 	/* For this to work, printbuffer must be larger than
@@ -720,3 +748,17 @@ int console_init_r(void)
 }
 
 #endif /* CONFIG_SYS_CONSOLE_IS_IN_ENV */
+
+#else
+
+int console_init_r(void) { return 0; }
+int ctrlc(void) { return 0; }
+int had_ctrlc(void) { return 0; }
+void clear_ctrlc(void) { }
+int console_assign(int file, const char *devname) { return -1; }
+int console_init_f(void) { return 0; }
+
+int getc(void) { return -1; }
+int tstc(void) { return -1; }
+
+#endif

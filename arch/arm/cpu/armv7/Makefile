@@ -26,6 +26,7 @@ include $(TOPDIR)/config.mk
 LIB	= $(obj)lib$(CPU).o
 
 START	:= start.o
+DATA    := uboot_hash.o
 
 ifndef CONFIG_SPL_BUILD
 COBJS	+= cache_v7.o
@@ -35,10 +36,11 @@ endif
 COBJS  += syslib.o
 
 SRCS	:= $(START:.o=.S) $(COBJS:.o=.c)
-OBJS	:= $(addprefix $(obj),$(COBJS))
+OBJS	:= $(addprefix $(obj),$(COBJS) $(COBJS-y) $(SOBJS))
 START	:= $(addprefix $(obj),$(START))
+DATA    := $(addprefix $(obj),$(DATA))
 
-all:	$(obj).depend $(START) $(LIB)
+all:	$(obj).depend $(START) $(LIB) $(DATA)
 
 $(LIB):	$(OBJS)
 	$(call cmd_link_o_target, $(OBJS))

@@ -49,6 +49,7 @@ CONFIG_NAME="${1%_config}"
 
 [ "${BOARD_NAME}" ] || BOARD_NAME="${1%_config}"
 
+target="$1"
 arch="$2"
 cpu="$3"
 if [ "$4" = "-" ] ; then
@@ -121,7 +122,8 @@ fi
 #
 # Create include file for Make
 #
-echo "ARCH   = ${arch}"  >  config.mk
+echo "TARGET = ${target}"  >  config.mk
+echo "ARCH   = ${arch}"  >> config.mk
 echo "CPU    = ${cpu}"   >> config.mk
 echo "BOARD  = ${board}" >> config.mk
 
@@ -152,6 +154,9 @@ for i in ${TARGETS} ; do
 	echo "#define CONFIG_${i}" >>config.h ;
 done
 
+if [ "x${SUNXI_MODE}" = "x${OTA_TEST_NAME}" ] ; then
+	echo "#define SUNXI_OTA_TEST" >> config.h
+fi
 cat << EOF >> config.h
 #define CONFIG_BOARDDIR board/$BOARDDIR
 #include <config_cmd_defaults.h>

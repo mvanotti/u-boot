@@ -2154,27 +2154,27 @@ If set and clear bit are written concurrently with 1, the associated bit is not 
 
 
 /***********************************************************************/
-/*  Module      :  I²C register address and bits                       */
+/*  Module      :  IÂ²C register address and bits                       */
 /***********************************************************************/
 
 #define INCA_IP_IIC                          (0xB8000700)
 /***********************************************************************/
 
 
-/***I²C Port Input Select Register***/
+/***IÂ²C Port Input Select Register***/
 #define INCA_IP_IIC_IIC_PISEL                    ((volatile u32*)(INCA_IP_IIC+ 0x0004))
 #define INCA_IP_IIC_IIC_PISEL_SDAIS(value)            (1 << value)
 
 #define INCA_IP_IIC_IIC_PISEL_SCLIS(value)            (1 << value)
 
 
-/***I²C Clock Control Register***/
+/***IÂ²C Clock Control Register***/
 #define INCA_IP_IIC_IIC_CLC                      ((volatile u32*)(INCA_IP_IIC+ 0x0000))
 #define INCA_IP_IIC_IIC_CLC_RMC (value)                (((( 1 << 8) - 1) & (value)) << 8)
 #define INCA_IP_IIC_IIC_CLC_DISS                            (1 << 1)
 #define INCA_IP_IIC_IIC_CLC_DISR                            (1 << 0)
 
-/***I²C System Control Register***/
+/***IÂ²C System Control Register***/
 #define INCA_IP_IIC_IIC_SYSCON_0                 ((volatile u32*)(INCA_IP_IIC+ 0x0010))
 #define INCA_IP_IIC_IIC_SYSCON_0_WMEN                            (1 << 31)
 #define INCA_IP_IIC_IIC_SYSCON_0_CI (value)                (((( 1 << 2) - 1) & (value)) << 26)
@@ -2198,7 +2198,7 @@ If set and clear bit are written concurrently with 1, the associated bit is not 
 #define INCA_IP_IIC_IIC_SYSCON_0_AL                              (1 << 1)
 #define INCA_IP_IIC_IIC_SYSCON_0_ADR                              (1 << 0)
 
-/***I²C System Control Register***/
+/***IÂ²C System Control Register***/
 #define INCA_IP_IIC_IIC_SYSCON_1                 ((volatile u32*)(INCA_IP_IIC+ 0x0010))
 #define INCA_IP_IIC_IIC_SYSCON_1_RM (value)                (((( 1 << 8) - 1) & (value)) << 24)
 #define INCA_IP_IIC_IIC_SYSCON_1_TRX                              (1 << 23)
@@ -2219,7 +2219,7 @@ If set and clear bit are written concurrently with 1, the associated bit is not 
 #define INCA_IP_IIC_IIC_SYSCON_1_AL                              (1 << 1)
 #define INCA_IP_IIC_IIC_SYSCON_1_ADR                              (1 << 0)
 
-/***I²C System Control Register***/
+/***IÂ²C System Control Register***/
 #define INCA_IP_IIC_IIC_SYSCON_2                 ((volatile u32*)(INCA_IP_IIC+ 0x0010))
 #define INCA_IP_IIC_IIC_SYSCON_2_WMEN                            (1 << 31)
 #define INCA_IP_IIC_IIC_SYSCON_2_CI (value)                (((( 1 << 2) - 1) & (value)) << 26)
@@ -2242,7 +2242,7 @@ If set and clear bit are written concurrently with 1, the associated bit is not 
 #define INCA_IP_IIC_IIC_SYSCON_2_AL                              (1 << 1)
 #define INCA_IP_IIC_IIC_SYSCON_2_ADR                              (1 << 0)
 
-/***I²C Write Hardware Modified System Control Register
+/***IÂ²C Write Hardware Modified System Control Register
 ***/
 #define INCA_IP_IIC_IIC_WHBSYSCON                 ((volatile u32*)(INCA_IP_IIC+ 0x0020))
 #define INCA_IP_IIC_IIC_WHBSYSCON_CLRWMEN                      (1 << 31)
@@ -2268,7 +2268,7 @@ If set and clear bit are written concurrently with 1, the associated bit is not 
 #define INCA_IP_IIC_IIC_WHBSYSCON_SETAL                          (1 << 2)
 #define INCA_IP_IIC_IIC_WHBSYSCON_CLRAL                          (1 << 1)
 
-/***I²C Bus Control Register***/
+/***IÂ²C Bus Control Register***/
 #define INCA_IP_IIC_IIC_BUSCON_0                 ((volatile u32*)(INCA_IP_IIC+ 0x0014))
 #define INCA_IP_IIC_IIC_BUSCON_0_BRPMOD                        (1 << 31)
 #define INCA_IP_IIC_IIC_BUSCON_0_PREDIV (value)             (((( 1 << 2) - 1) & (value)) << 29)
@@ -2279,7 +2279,7 @@ If set and clear bit are written concurrently with 1, the associated bit is not 
 #define INCA_IP_IIC_IIC_BUSCON_0_SDAEN(value)            (1 << value)
 
 
-/***I²C Bus Control Register***/
+/***IÂ²C Bus Control Register***/
 #define INCA_IP_IIC_IIC_BUSCON_1                 ((volatile u32*)(INCA_IP_IIC+ 0x0014))
 #define INCA_IP_IIC_IIC_BUSCON_1_BRPMOD                        (1 << 31)
 #define INCA_IP_IIC_IIC_BUSCON_1_PREDIV (value)             (((( 1 << 2) - 1) & (value)) << 29)
@@ -2290,7 +2290,7 @@ If set and clear bit are written concurrently with 1, the associated bit is not 
 #define INCA_IP_IIC_IIC_BUSCON_1_SDAEN(value)            (1 << value)
 
 
-/***I²C Receive Transmit Buffer***/
+/***IÂ²C Receive Transmit Buffer***/
 #define INCA_IP_IIC_IIC_RTB                      ((volatile u32*)(INCA_IP_IIC+ 0x0018))
 #define INCA_IP_IIC_IIC_RTB_RTB(value)              (1 << value)
 

@@ -32,15 +32,14 @@ COBJS-y += command.o
 COBJS-y += dlmalloc.o
 COBJS-y += exports.o
 COBJS-$(CONFIG_SYS_HUSH_PARSER) += hush.o
-COBJS-y += image.o
+COBJS-$(CONFIG_CMD_BOOTM) += image.o
 COBJS-y += s_record.o
 COBJS-$(CONFIG_SERIAL_MULTI) += serial.o
-COBJS-y += xyzModem.o
-
+COBJS-$(CONFIG_XYZ_MODEM) += xyzModem.o
 # core command
-COBJS-y += cmd_boot.o
 COBJS-$(CONFIG_CMD_BOOTM) += cmd_bootm.o
-COBJS-y += cmd_help.o
+COBJS-$(CONFIG_CMD_BOOTA) += cmd_boota.o
+COBJS-$(CONFIG_CMD_HELP) += cmd_help.o
 COBJS-y += cmd_nvedit.o
 COBJS-y += cmd_version.o
 
@@ -54,14 +53,19 @@ XCOBJS-$(CONFIG_ENV_IS_IN_FLASH) += env_embedded.o
 COBJS-$(CONFIG_ENV_IS_IN_NVRAM) += env_embedded.o
 COBJS-$(CONFIG_ENV_IS_IN_FLASH) += env_flash.o
 COBJS-$(CONFIG_ENV_IS_IN_MG_DISK) += env_mgdisk.o
-COBJS-$(CONFIG_ENV_IS_IN_MMC) += env_mmc.o
+#COBJS-$(CONFIG_ENV_IS_IN_MMC) += env_mmc.o
 COBJS-$(CONFIG_ENV_IS_IN_NAND) += env_nand.o
+COBJS-$(CONFIG_ENV_IS_IN_SUNXI_FLASH) += env_sunxi_flash.o
+#COBJS-$(CONFIG_ENV_IS_IN_NAND_SUNXI) += env_nand_sunxi.o
 COBJS-$(CONFIG_ENV_IS_IN_NVRAM) += env_nvram.o
 COBJS-$(CONFIG_ENV_IS_IN_ONENAND) += env_onenand.o
 COBJS-$(CONFIG_ENV_IS_IN_SPI_FLASH) += env_sf.o
 COBJS-$(CONFIG_ENV_IS_NOWHERE) += env_nowhere.o
 
 # command
+#COBJS-y += cmd_sunxi_display.o
+COBJS-y += cmd_sunxi_flash.o
+COBJS-y += cmd_fel.o
 COBJS-$(CONFIG_CMD_AMBAPP) += cmd_ambapp.o
 COBJS-$(CONFIG_SOURCE) += cmd_source.o
 COBJS-$(CONFIG_CMD_SOURCE) += cmd_source.o
@@ -108,7 +112,6 @@ COBJS-$(CONFIG_CMD_CRAMFS) += cmd_cramfs.o
 COBJS-$(CONFIG_CMD_LDRINFO) += cmd_ldrinfo.o
 COBJS-$(CONFIG_CMD_LED) += cmd_led.o
 COBJS-$(CONFIG_CMD_LICENSE) += cmd_license.o
-COBJS-y += cmd_load.o
 COBJS-$(CONFIG_LOGBUFFER) += cmd_log.o
 COBJS-$(CONFIG_ID_EEPROM) += cmd_mac.o
 COBJS-$(CONFIG_CMD_MD5SUM) += cmd_md5sum.o
@@ -134,7 +137,6 @@ COBJS-$(CONFIG_CMD_OTP) += cmd_otp.o
 ifdef CONFIG_PCI
 COBJS-$(CONFIG_CMD_PCI) += cmd_pci.o
 endif
-COBJS-y += cmd_pcmcia.o
 COBJS-$(CONFIG_CMD_PORTIO) += cmd_portio.o
 COBJS-$(CONFIG_CMD_REGINFO) += cmd_reginfo.o
 COBJS-$(CONFIG_CMD_REISER) += cmd_reiser.o
@@ -160,12 +162,12 @@ COBJS-$(CONFIG_USB_STORAGE) += usb_storage.o
 endif
 COBJS-$(CONFIG_CMD_XIMG) += cmd_ximg.o
 COBJS-$(CONFIG_YAFFS2) += cmd_yaffs2.o
+COBJS-$(CONFIG_SUNXI_SECURE_SYSTEM) += cmd_sunxi_verify.o
 
 # others
 COBJS-$(CONFIG_DDR_SPD) += ddr_spd.o
 COBJS-$(CONFIG_HWCONFIG) += hwconfig.o
 COBJS-$(CONFIG_CONSOLE_MUX) += iomux.o
-COBJS-y += flash.o
 COBJS-$(CONFIG_CMD_KGDB) += kgdb.o kgdb_stubs.o
 COBJS-$(CONFIG_KALLSYMS) += kallsyms.o
 COBJS-$(CONFIG_LCD) += lcd.o
@@ -175,10 +177,29 @@ COBJS-$(CONFIG_UPDATE_TFTP) += update.o
 COBJS-$(CONFIG_USB_KEYBOARD) += usb_kbd.o
 endif
 
+COBJS-$(CONFIG_FASTBOOT) += cmd_fastboot.o
+
 COBJS-y += console.o
-COBJS-y += memsize.o
 COBJS-y += stdio.o
 
+COBJS-y += memsize.o
+COBJS-$(CONFIG_NONCACHE_MEMORY) += sunxi_mem_alloc.o
+ifndef CONFIG_SUNXI_SPINOR_PLATFORM
+COBJS-$(CONFIG_CMD_MEMTEST) += cmd_sunxi_memtest.o
+COBJS-$(CONFIG_CMD_SUNXI_BMP) += cmd_sunxi_bmp.o
+COBJS-y += cmd_boot.o
+COBJS-y += cmd_load.o
+COBJS-$(CONFIG_CMD_PCMCIA) += cmd_pcmcia.o
+COBJS-$(CONFIG_SUNXI_SPRITE_SYSRECOVERY) += cmd_onekey_recovery.o
+COBJS-$(CONFIG_CMD_SVUDATA) += cmd_svudata.o
+COBJS-$(CONFIG_CMD_FLASH) += flash.o
+COBJS-y += cmd_shutdown.o
+COBJS-y += cmd_standby.o
+COBJS-$(CONFIG_CMD_SUNXI_SIGNATURE) += cmd_sunxi_signature.o
+COBJS-$(CONFIG_CMD_MODIFY_SYSCONFIG) += cmd_modify_sysconfig.o
+COBJS-$(CONFIG_CMD_RECOVERY) += cmd_recovery.o
+endif
+COBJS-$(CONFIG_CMD_BURN) += cmd_burn.o
 
 COBJS	:= $(sort $(COBJS-y))
 XCOBJS	:= $(sort $(XCOBJS-y))

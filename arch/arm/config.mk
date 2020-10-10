@@ -21,7 +21,7 @@
 # MA 02111-1307 USA
 #
 
-CROSS_COMPILE ?= arm-linux-
+CROSS_COMPILE ?= arm-linux-gnueabi-
 
 ifndef CONFIG_STANDALONE_LOAD_ADDR
 ifeq ($(SOC),omap3)
@@ -31,10 +31,12 @@ CONFIG_STANDALONE_LOAD_ADDR = 0xc100000
 endif
 endif
 
-PLATFORM_CPPFLAGS += -DCONFIG_ARM -D__ARM__
+PLATFORM_CPPFLAGS += -DCONFIG_ARM -D__ARM__ -mfpu=neon -D__NEON_SIMD__
 
 # Explicitly specifiy 32-bit ARM ISA since toolchain default can be -mthumb:
+ifndef CONFIG_SPL
 PLATFORM_CPPFLAGS += $(call cc-option,-marm,)
+endif
 
 # Try if EABI is supported, else fall back to old API,
 # i. e. for example:
@@ -44,6 +46,7 @@ PLATFORM_CPPFLAGS += $(call cc-option,-marm,)
 #	-mabi=apcs-gnu -mno-thumb-interwork
 # - with ELDK 3.1 (gcc 3.x), use:
 #	-mapcs-32 -mno-thumb-interwork
+ifndef CONFIG_SPL
 PLATFORM_CPPFLAGS += $(call cc-option,\
 				-mabi=aapcs-linux -mno-thumb-interwork,\
 				$(call cc-option,\
@@ -53,6 +56,17 @@ PLATFORM_CPPFLAGS += $(call cc-option,\
 					)\
 				) $(call cc-option,-mno-thumb-interwork,)\
 			)
+else
+PLATFORM_CPPFLAGS += $(call cc-option,\
+				-mabi=aapcs-linux -mthumb-interwork,\
+				$(call cc-option,\
+					-mapcs-32,\
+					$(call cc-option,\
+						-mabi=apcs-gnu,\
+					)\
+				) $(call cc-option,-mthumb-interwork,)\
+			)
+endif
 
 # For EABI, make sure to provide raise()
 ifneq (,$(findstring -mabi=aapcs-linux,$(PLATFORM_CPPFLAGS)))
@@ -73,10 +87,20 @@ ifdef CONFIG_SYS_LDSCRIPT
 # need to strip off double quotes
 LDSCRIPT := $(subst ",,$(CONFIG_SYS_LDSCRIPT))
 else
+ifdef CONFIG_CPUS_STANDBY
+LDSCRIPT := $(SRCTREE)/$(CPUDIR)/u-boot-cpus.lds
+else
+ifdef CONFIG_NO_BOOT_STANDBY
+LDSCRIPT := $(SRCTREE)/$(CPUDIR)/u-boot-nostandby.lds
+else
 LDSCRIPT := $(SRCTREE)/$(CPUDIR)/u-boot.lds
+endif
+endif
 endif
 
 # needed for relocation
 ifndef CONFIG_NAND_SPL
+ifndef CONFIG_SPL
 LDFLAGS_u-boot += -pie
+endif
 endif

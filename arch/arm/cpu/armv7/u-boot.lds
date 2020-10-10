@@ -29,21 +29,38 @@ OUTPUT_ARCH(arm)
 ENTRY(_start)
 SECTIONS
 {
-	. = 0x00000000;
+	. = BOOTADDR;
 
 	. = ALIGN(4);
+
+	.head   :
+	{
+		SOCDIR/spare_head.o	(.data)
+	}
+        .hash   :
+        {
+            SOCDIR/../uboot_hash.o      (.data)
+        }
+	. = ALIGN(1);
+
 	.text	:
 	{
-		arch/arm/cpu/armv7/start.o	(.text)
-		*(.text)
+		__int_vector_start = .;
+		CPUDIR/start.o (.text*)
+		__int_vector_end = .;
+		*(EXCLUDE_FILE(STANDBYDIR/libstandby.o ).text)
 	}
 
-	. = ALIGN(4);
-	.rodata : { *(SORT_BY_ALIGNMENT(SORT_BY_NAME(.rodata*))) }
+	. = ALIGN(16);
+	.rodata :
+	{
+		*(EXCLUDE_FILE(STANDBYDIR/libstandby.o ).rodata*)
+	}
 
-	. = ALIGN(4);
-	.data : {
-		*(.data)
+	. = ALIGN(16);
+	.data :
+	{
+		*(EXCLUDE_FILE(STANDBYDIR/libstandby.o ).data)
 	}
 
 	. = ALIGN(4);
@@ -69,6 +86,15 @@ SECTIONS
 	}
 
 	_end = .;
+
+	_standby_start_lma = .;
+	.boot_standby STANDBY_ADDR :
+	AT ( ADDR (.dynsym) + SIZEOF (.dynsym) )
+	{
+		_standby_start = .;
+		STANDBYDIR/libstandby.o (.text .data .bss .rodata)
+		_standby_end = .;
+	}
 
 	.bss __rel_dyn_start (OVERLAY) : {
 		__bss_start = .;

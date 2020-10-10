@@ -281,7 +281,7 @@ static inline char *portspeed(int speed)
 void usb_show_tree_graph(struct usb_device *dev, char *pre)
 {
 	int i, index;
-	int has_child, last_child, port;
+	int has_child, last_child;
 
 	index = strlen(pre);
 	printf(" %s", pre);
@@ -300,7 +300,6 @@ void usb_show_tree_graph(struct usb_device *dev, char *pre)
 				/* found our pointer, see if we have a
 				 * little sister
 				 */
-				port = i;
 				while (i++ < dev->parent->maxchild) {
 					if (dev->parent->children[i] != NULL) {
 						/* found a sister */
@@ -667,6 +666,47 @@ int do_usb(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 			return 1;
 		}
 	}
+	if (strcmp(argv[1], "fsread") == 0) {
+		char  usb_filename[32];
+		debug("usb_stor_curr_dev is %d \n",usb_stor_curr_dev);
+		if (usb_stor_curr_dev < 0) {
+			printf("no current device selected\n");
+			return 1;
+		}
+		if (argc == 5) {
+			char *const usb_argv[6] = { "fatload", "usb", argv[2], argv[4], usb_filename, NULL };
+			memset(usb_filename, 0, 32);
+			strcpy(usb_filename, argv[3]);
+			if(do_fat_fsload(0, 0, 5, usb_argv))
+			{
+				printf("sunxi usb info error : unable to open file %s\n", usb_argv[4]);
+				return -1;
+			}
+			return 0;
+
+		}
+	}
+	if (strcmp(argv[1], "fswrite") == 0) {
+		char  usb_filename[32];
+		debug("usb_stor_curr_dev is %d \n",usb_stor_curr_dev);
+		if (usb_stor_curr_dev < 0) {
+			printf("no current device selected\n");
+			return 1;
+		}
+		if (argc == 6) {
+			char *const usb_argv[6] = { "fatdown", "usb", argv[2], argv[4], usb_filename, argv[5] };
+			memset(usb_filename, 0, 32);
+			strcpy(usb_filename, argv[3]);
+			if(do_fat_fsdown(0, 0, 6, usb_argv))
+			{
+				printf("sunxi usb info error : unable to open file %s\n", usb_argv[4]);
+				return -1;
+			}
+			return 0;
+
+		}
+	}
+
 	if (strncmp(argv[1], "dev", 3) == 0) {
 		if (argc == 3) {
 			int dev = (int)simple_strtoul(argv[2], NULL, 10);
@@ -699,7 +739,7 @@ int do_usb(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 
 #ifdef CONFIG_USB_STORAGE
 U_BOOT_CMD(
-	usb,	5,	1,	do_usb,
+	usb,	6,	1,	do_usb,
 	"USB sub-system",
 	"reset - reset (rescan) USB controller\n"
 	"usb stop [f]  - stop USB [f]=force stop\n"
@@ -713,6 +753,8 @@ U_BOOT_CMD(
 	"    to memory address `addr'\n"
 	"usb write addr blk# cnt - write `cnt' blocks starting at block `blk#'\n"
 	"    from memory address `addr'"
+	"usb fswrite dev filename addr size- write `size' bytes and save as filename in usb storage\n"
+	"usb fsread dev filename addr  - read 'filename' from usb storage and store at memory address 'addr'\n"
 );
 
 
@@ -731,3 +773,7 @@ U_BOOT_CMD(
 	"usb  info [dev] - show available USB devices"
 );
 #endif
+
+
+
+

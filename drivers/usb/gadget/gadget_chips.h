@@ -150,6 +150,11 @@
 #define	gadget_is_m66592(g)	0
 #endif
 
+#ifdef CONFIG_ARCH_SUN9IW1P1
+#define gadget_is_sunxi(g)		(!strcmp("sunxi-gadget", (g)->name))
+#else
+#define gadget_is_softwinner_otg(g)    (!strcmp("sunxi_usb_udc", (g)->name))
+#endif
 
 /*
  * CONFIG_USB_GADGET_SX2
@@ -216,5 +221,13 @@ static inline int usb_gadget_controller_number(struct usb_gadget *gadget)
 		return 0x20;
 	else if (gadget_is_m66592(gadget))
 		return 0x21;
+#ifdef CONFIG_ARCH_SUN9IW1
+	else if (gadget_is_sunxi(gadget))
+		return 0x22;
+#else
+	else if(gadget_is_softwinner_otg(gadget))
+		return 0x23;
+#endif
+
 	return -ENOENT;
 }
